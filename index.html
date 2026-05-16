@@ -4,175 +4,156 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Filament Transmittance & LUT Generator</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #09090b; }
+        body { background-color: #09090b; color: #f4f4f5; }
+        .bg-zinc-900 { background-color: #18181b; }
+        .bg-zinc-800 { background-color: #27272a; }
+        .bg-zinc-950 { background-color: #09090b; }
+        input, select { color: white; border: none; outline: none; }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <div>
+            <h1 class="text-4xl font-bold mb-2">3D Filament Transmittance & LUT Generator</h1>
+            <p class="text-zinc-400 max-w-3xl">
+                Generate Beer-Lambert transmittance curves, image correction curves, and LUT mapping data for creating lithophane and backlit height-map images using 3D printer filament.
+            </p>
+        </div>
 
-    <script type="text/babel">
-        function PETGTransmissionTool() {
-            const filamentDatabase = {
-                "Elegoo Rapid PETG White": { alpha: 0.6 },
-                "Generic White PLA": { alpha: 0.85 },
-                "Transparent PETG": { alpha: 0.25 },
-                "White ABS": { alpha: 1.1 },
-            };
-
-            const [lumens, setLumens] = React.useState(806);
-            const [distance, setDistance] = React.useState(10);
-            const [bulbDiameter, setBulbDiameter] = React.useState(6);
-            const [thickness, setThickness] = React.useState(5);
-            const [selectedFilament, setSelectedFilament] = React.useState("Elegoo Rapid PETG White");
-
-            const alpha = filamentDatabase[selectedFilament].alpha;
-
-            const generateData = () => {
-                const transmittanceData = [];
-                const curveData = [];
-                const lutData = [];
-
-                for (let x = 0; x <= thickness; x += 0.1) {
-                    const T = Math.exp(-alpha * x);
-                    const transmittedLumens = lumens * T;
-
-                    transmittanceData.push({
-                        thickness: Number(x.toFixed(2)),
-                        transmittance: Number((T * 100).toFixed(2)),
-                        lumens: Number(transmittedLumens.toFixed(2)),
-                    });
-                }
-
-                for (let i = 0; i <= 255; i++) {
-                    const brightness = i / 255;
-                    const corrected = -Math.log(Math.max(0.001, brightness));
-                    const normalized = Math.min(corrected / 6, 1);
-                    const output = Math.round(normalized * 255);
-
-                    curveData.push({ input: i, output });
-                    lutData.push(output);
-                }
-
-                return { transmittanceData, curveData, lutData };
-            };
-
-            const data = generateData();
-
-            const downloadLUT = () => {
-                const blob = new Blob([JSON.stringify(data.lutData, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "lut-data.json";
-                a.click();
-            };
-
-            return (
-                <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">
-                    <div className="max-w-7xl mx-auto space-y-6">
-                        <div>
-                            <h1 className="text-4xl font-bold mb-2">3D Filament Transmittance & LUT Generator</h1>
-                            <p className="text-zinc-400 max-w-3xl">
-                                Generate Beer-Lambert transmittance curves, image correction curves, and LUT mapping data for creating lithophane and backlit height-map images using 3D printer filament.
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
-                                <h2 className="text-2xl font-semibold">Light Globe Settings</h2>
-                                <div>
-                                    <label className="block mb-1 text-sm text-zinc-400">Globe Lumens</label>
-                                    <input type="number" value={lumens} onChange={(e) => setLumens(Number(e.target.value))} className="w-full bg-zinc-800 rounded-xl p-3" />
-                                </div>
-                                <div>
-                                    <label className="block mb-1 text-sm text-zinc-400">Globe Diameter (cm)</label>
-                                    <input type="number" value={bulbDiameter} onChange={(e) => setBulbDiameter(Number(e.target.value))} className="w-full bg-zinc-800 rounded-xl p-3" />
-                                </div>
-                                <div>
-                                    <label className="block mb-1 text-sm text-zinc-400">Distance from Material (cm)</label>
-                                    <input type="number" value={distance} onChange={(e) => setDistance(Number(e.target.value))} className="w-full bg-zinc-800 rounded-xl p-3" />
-                                </div>
-                            </div>
-
-                            <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
-                                <h2 className="text-2xl font-semibold">Filament Settings</h2>
-                                <div>
-                                    <label className="block mb-1 text-sm text-zinc-400">Filament Type</label>
-                                    <select value={selectedFilament} onChange={(e) => setSelectedFilament(e.target.value)} className="w-full bg-zinc-800 rounded-xl p-3">
-                                        {Object.keys(filamentDatabase).map((filament) => (<option key={filament}>{filament}</option>))}
-                                    </select>
-                                </div>
-                                <div className="bg-zinc-800 rounded-xl p-4">
-                                    <div className="text-sm text-zinc-400">Absorption Coefficient (α)</div>
-                                    <div className="text-2xl font-bold">{alpha} mm⁻¹</div>
-                                </div>
-                                <div>
-                                    <label className="block mb-1 text-sm text-zinc-400">Maximum Material Thickness (mm)</label>
-                                    <input type="number" step="0.1" value={thickness} onChange={(e) => setThickness(Number(e.target.value))} className="w-full bg-zinc-800 rounded-xl p-3" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl overflow-auto">
-                                <h2 className="text-2xl font-semibold mb-4">Material Transmittance Graph</h2>
-                                <div className="space-y-2 text-sm font-mono">
-                                    {data.transmittanceData.slice(0, 30).map((d, idx) => (
-                                        <div key={idx} className="grid grid-cols-3 border-b border-zinc-800 py-1">
-                                            <div>{d.thickness} mm</div>
-                                            <div>{d.transmittance}%</div>
-                                            <div>{d.lumens} lm</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl overflow-auto">
-                                <h2 className="text-2xl font-semibold mb-4">Image Adjustment Curve</h2>
-                                <div className="space-y-2 text-sm font-mono">
-                                    {data.curveData.slice(0, 40).map((d, idx) => (
-                                        <div key={idx} className="grid grid-cols-2 border-b border-zinc-800 py-1">
-                                            <div>Input: {d.input}</div>
-                                            <div>Output: {d.output}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
-                            <h2 className="text-2xl font-semibold">LUT Heightmap Conversion Data</h2>
-                            <p className="text-zinc-400">
-                                This LUT data can be used to generate a grayscale image conversion profile that compensates for exponential light attenuation through the filament material.
-                            </p>
-                            <div className="bg-zinc-950 rounded-xl p-4 overflow-auto text-xs font-mono max-h-80">
-                                {JSON.stringify(data.lutData.slice(0, 128), null, 2)}
-                            </div>
-                            <button onClick={downloadLUT} className="bg-white text-black px-6 py-3 rounded-xl font-semibold hover:opacity-80 transition">
-                                Download LUT JSON
-                            </button>
-                        </div>
-
-                        <div className="bg-zinc-900 rounded-2xl p-6 shadow-xl">
-                            <h2 className="text-2xl font-semibold mb-4">Mathematical Model</h2>
-                            <div className="space-y-3 text-zinc-300">
-                                <div>Beer-Lambert Equation: <div className="font-mono text-green-400 mt-1">T = e^(-αx)</div></div>
-                                <div>Inverse Brightness Correction: <div className="font-mono text-cyan-400 mt-1">x = -ln(T) / α</div></div>
-                                <div>This workflow compensates for nonlinear light attenuation through 3D printed filament and generates more accurate backlit lithophane-style images.</div>
-                            </div>
-                        </div>
-                    </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
+                <h2 class="text-2xl font-semibold">Light Globe Settings</h2>
+                <div>
+                    <label class="block mb-1 text-sm text-zinc-400">Globe Lumens</label>
+                    <input type="number" id="lumens" value="806" class="w-full bg-zinc-800 rounded-xl p-3" />
                 </div>
-            );
+                <div>
+                    <label class="block mb-1 text-sm text-zinc-400">Globe Diameter (cm)</label>
+                    <input type="number" id="bulbDiameter" value="6" class="w-full bg-zinc-800 rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm text-zinc-400">Distance from Material (cm)</label>
+                    <input type="number" id="distance" value="10" class="w-full bg-zinc-800 rounded-xl p-3" />
+                </div>
+            </div>
+
+            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
+                <h2 class="text-2xl font-semibold">Filament Settings</h2>
+                <div>
+                    <label class="block mb-1 text-sm text-zinc-400">Filament Type</label>
+                    <select id="filamentType" class="w-full bg-zinc-800 rounded-xl p-3">
+                        <option value="0.6">Elegoo Rapid PETG White</option>
+                        <option value="0.85">Generic White PLA</option>
+                        <option value="0.25">Transparent PETG</option>
+                        <option value="1.1">White ABS</option>
+                    </select>
+                </div>
+                <div class="bg-zinc-800 rounded-xl p-4">
+                    <div class="text-sm text-zinc-400">Absorption Coefficient (α)</div>
+                    <div class="text-2xl font-bold" id="alphaDisplay">0.6 mm⁻¹</div>
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm text-zinc-400">Maximum Material Thickness (mm)</label>
+                    <input type="number" id="thickness" step="0.1" value="5" class="w-full bg-zinc-800 rounded-xl p-3" />
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl overflow-auto h-[400px]">
+                <h2 class="text-2xl font-semibold mb-4">Material Transmittance Graph</h2>
+                <div id="transmittanceTable" class="space-y-2 text-sm font-mono"></div>
+            </div>
+
+            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl overflow-auto h-[400px]">
+                <h2 class="text-2xl font-semibold mb-4">Image Adjustment Curve</h2>
+                <div id="curveTable" class="space-y-2 text-sm font-mono"></div>
+            </div>
+        </div>
+
+        <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 class="text-2xl font-semibold">LUT Heightmap Conversion Data</h2>
+            <p class="text-zinc-400">
+                This LUT data can be used to generate a grayscale image conversion profile that compensates for exponential light attenuation through the filament material.
+            </p>
+            <div id="lutDisplay" class="bg-zinc-950 rounded-xl p-4 overflow-auto text-xs font-mono max-h-80"></div>
+            <button id="downloadBtn" class="bg-white text-black px-6 py-3 rounded-xl font-semibold hover:opacity-80 transition">
+                Download LUT JSON
+            </button>
+        </div>
+
+        <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-2xl font-semibold mb-4">Mathematical Model</h2>
+            <div class="space-y-3 text-zinc-300">
+                <div>Beer-Lambert Equation: <div class="font-mono text-green-400 mt-1">T = e^(-αx)</div></div>
+                <div>Inverse Brightness Correction: <div class="font-mono text-cyan-400 mt-1">x = -ln(T) / α</div></div>
+                <div>This workflow compensates for nonlinear light attenuation through 3D printed filament and generates more accurate backlit lithophane-style images.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLutData = [];
+
+        function update() {
+            const lumens = parseFloat(document.getElementById('lumens').value);
+            const alpha = parseFloat(document.getElementById('filamentType').value);
+            const maxThickness = parseFloat(document.getElementById('thickness').value);
+            
+            document.getElementById('alphaDisplay').innerText = alpha + ' mm⁻¹';
+
+            // Transmittance Data
+            const transTable = document.getElementById('transmittanceTable');
+            transTable.innerHTML = '';
+            for (let x = 0; x <= maxThickness; x += 0.1) {
+                const T = Math.exp(-alpha * x);
+                const transmittedLumens = lumens * T;
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-3 border-b border-zinc-800 py-1';
+                row.innerHTML = `<div>${x.toFixed(2)} mm</div><div>${(T * 100).toFixed(2)}%</div><div>${transmittedLumens.toFixed(2)} lm</div>`;
+                transTable.appendChild(row);
+            }
+
+            // Curve & LUT Data
+            const curveTable = document.getElementById('curveTable');
+            const lutDisplay = document.getElementById('lutDisplay');
+            curveTable.innerHTML = '';
+            currentLutData = [];
+
+            for (let i = 0; i <= 255; i++) {
+                const brightness = i / 255;
+                const corrected = -Math.log(Math.max(0.001, brightness));
+                const normalized = Math.min(corrected / 6, 1);
+                const output = Math.round(normalized * 255);
+                
+                currentLutData.push(output);
+
+                if (i <= 40) {
+                    const row = document.createElement('div');
+                    row.className = 'grid grid-cols-2 border-b border-zinc-800 py-1';
+                    row.innerHTML = `<div>Input: ${i}</div><div>Output: ${output}</div>`;
+                    curveTable.appendChild(row);
+                }
+            }
+
+            lutDisplay.innerText = JSON.stringify(currentLutData.slice(0, 128), null, 2);
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<PETGTransmissionTool />);
+        document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', update));
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const blob = new Blob([JSON.stringify(currentLutData, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "lut-data.json";
+            a.click();
+        });
+
+        // Initial run
+        update();
     </script>
 </body>
 </html>
