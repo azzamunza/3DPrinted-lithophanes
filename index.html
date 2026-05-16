@@ -141,12 +141,23 @@
         function getCorrectedValue(r, g, b, alpha, maxThickness) {
             // 1. Rec.709 Luminance
             const lum = (0.2126 * r / 255) + (0.7152 * g / 255) + (0.0722 * b / 255);
-            // 2. Beer-Lambert Correction
-            const corrected = -Math.log(Math.max(0.001, lum));
-            // 3. Map to Thickness (0-1), then to (0-255)
-            // This naturally inverts: Bright -> 0 Thickness, Dark -> Max Thickness
-            const outVal = Math.min(corrected / alpha / maxThickness, 1.0);
-            return Math.round(outVal * 255);
+            
+            // 2. Beer-Lambert Correction (Logarithmic)
+            // T = e^(-alpha * x) => x = -ln(T) / alpha
+            // We want to map Luminance (T) to Thickness (x)
+            const thickness = -Math.log(Math.max(0.001, lum)) / alpha;
+            
+            // 3. Normalized thickness (0 to 1) based on user's max thickness
+            // For a standard lithophane: 
+            // Input White (lum=1) -> Thickness 0 (Thin/Light)
+            // Input Black (lum~0) -> Thickness maxThickness (Thick/Dark)
+            let normalized = thickness / maxThickness;
+            
+            // Clamp to [0, 1] range to avoid clipping and preserve detail
+            normalized = Math.min(Math.max(normalized, 0), 1);
+
+            // Return 8-bit height value (0=Thin/White, 255=Thick/Black)
+            return Math.round(normalized * 255);
         }
 
         function update() {
