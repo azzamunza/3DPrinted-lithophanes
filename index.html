@@ -170,21 +170,26 @@
             // 1. Rec.709 Luminance
             const lum = (0.2126 * r / 255) + (0.7152 * g / 255) + (0.0722 * b / 255);
             
-            // 2. Beer-Lambert Correction (Logarithmic)
-            // T = e^(-alpha * x) => x = -ln(T) / alpha
-            // We want to map Luminance (T) to Thickness (x)
+            // 2. Linear Contrast Stretch (optional but helpful for 8-bit precision)
+            // If the user's input doesn't hit pure white or pure black, we can clip/stretch here.
+            
+            // 3. Beer-Lambert Correction (Inverted for Lithophane)
+            // T = e^(-alpha * x)
+            // We want to map Luminance (T) to Thickness (x).
+            // At T=1.0 (White), x should be 0.
+            // At T=min (Dark), x should be maxThickness.
+            
+            // Log math: thickness is proportional to -ln(T)
             const thickness = -Math.log(Math.max(0.001, lum)) / alpha;
             
-            // 3. Normalized thickness (0 to 1) based on user's max thickness
-            // For a standard lithophane: 
-            // Input White (lum=1) -> Thickness 0 (Thin/Light)
-            // Input Black (lum~0) -> Thickness maxThickness (Thick/Dark)
-            let normalized = thickness / maxThickness;
+            // 4. PRESERVE HIGHLIGHTS: Standard Beer-Lambert can be extremely steep at T=1.0.
+            // We apply a slight gamma correction to the thickness calculation to spread out the 
+            // values in the highlight (thin) region.
+            const gamma = 1.2; // Increase detail in thin/bright areas
+            let normalized = Math.pow(thickness / maxThickness, 1 / gamma);
             
-            // Clamp to [0, 1] range to avoid clipping and preserve detail
             normalized = Math.min(Math.max(normalized, 0), 1);
 
-            // Return 8-bit height value (0=Thin/White, 255=Thick/Black)
             return Math.round(normalized * 255);
         }
 
