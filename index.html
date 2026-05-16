@@ -91,12 +91,17 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-2">
-                    <label class="text-sm text-zinc-400">LUT Visualization Stripe (0-255)</label>
-                    <canvas id="lutCanvas" class="w-full h-12 rounded-lg bg-black border border-zinc-700"></canvas>
+                    <label class="text-sm text-zinc-400">LUT Visualization Stripe (Final Heightmap Output)</label>
+                    <canvas id="lutCanvas" class="w-full h-16 rounded-lg bg-black border border-zinc-700 shadow-inner"></canvas>
+                    <p class="text-[10px] text-zinc-500">Left (0/Black) to Right (255/White) input mapping</p>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-sm text-zinc-400">RAW LUT Values (Preview)</label>
-                    <div id="lutDisplay" class="bg-zinc-950 rounded-xl p-3 text-[10px] font-mono h-12 overflow-hidden text-zinc-500 italic"></div>
+                <div class="space-y-2 flex flex-col">
+                    <label class="text-sm text-zinc-400">Hald CLUT Image (Visual Reference)</label>
+                    <div class="flex gap-4 items-center">
+                        <canvas id="haldCanvas" class="w-16 h-16 rounded bg-black border border-zinc-700"></canvas>
+                        <button id="downloadHaldBtn" class="bg-zinc-800 text-xs text-zinc-300 px-3 py-1 rounded hover:bg-zinc-700">Download PNG</button>
+                    </div>
+                    <div id="lutDisplay" class="hidden"></div>
                 </div>
             </div>
         </div>
@@ -142,7 +147,7 @@
         function update() {
             const lumens = parseFloat(document.getElementById('lumens').value) || 0;
             const alpha = parseFloat(document.getElementById('filamentType').value);
-            const maxThickness = parseFloat(document.getElementById('thickness').value) || 0;
+            const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
             
             document.getElementById('alphaDisplay').innerText = alpha + ' mm⁻¹';
 
@@ -158,7 +163,7 @@
             transmittanceChart.data.datasets[0].data = transValues;
             transmittanceChart.update();
 
-            // Update Curve & LUT
+            // Update Curve & LUT (Synchronized with 3D LUT logic)
             const curveLabels = [];
             const curveValues = [];
             currentLutData = [];
@@ -166,8 +171,11 @@
             for (let i = 0; i <= 255; i++) {
                 const brightness = i / 255;
                 const corrected = -Math.log(Math.max(0.001, brightness));
-                const normalized = Math.min(corrected / 6, 1);
-                const output = Math.round(normalized * 255);
+                
+                // Map to thickness: 0.0 (white/thin) to 1.0 (black/thick)
+                // Note: The log math naturally handles the inversion (1.0 brightness -> 0 corrected)
+                const outVal = Math.min(corrected / alpha / maxThickness, 1.0);
+                const output = Math.round(outVal * 255);
                 
                 currentLutData.push(output);
                 curveLabels.push(i);
@@ -177,23 +185,51 @@
             curveChart.data.datasets[0].data = curveValues;
             curveChart.update();
 
-            // Update LUT Visualization
+            // Update LUT Visualization Stripe
             const canvas = document.getElementById('lutCanvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 256;
-            canvas.height = 1;
-            const imgData = ctx.createImageData(256, 1);
+            canvas.height = 64; 
             for (let i = 0; i < 256; i++) {
                 const val = currentLutData[i];
-                imgData.data[i * 4] = val;
-                imgData.data[i * 4 + 1] = val;
-                imgData.data[i * 4 + 2] = val;
-                imgData.data[i * 4 + 3] = 255;
+                ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
+                ctx.fillRect(i, 0, 1, 64);
             }
-            ctx.putImageData(imgData, 0, 0);
 
-            document.getElementById('lutDisplay').innerText = currentLutData.slice(0, 64).join(', ') + '...';
+            // Update Hald CLUT Image (Visual representation of the 3D LUT)
+            const hald = document.getElementById('haldCanvas');
+            const hctx = hald.getContext('2d');
+            hald.width = 64;
+            hald.height = 64;
+            const hData = hctx.createImageData(64, 64);
+            
+            for (let y = 0; y < 64; y++) {
+                for (let x = 0; x < 64; x++) {
+                    const idx = (y * 64 + x) * 4;
+                    const r = (x / 63);
+                    const g = (y / 63);
+                    const b = 0.5; // Fixed blue for visualization
+                    
+                    const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+                    const corrected = -Math.log(Math.max(0.001, luminance));
+                    const outVal = Math.min(corrected / alpha / maxThickness, 1.0) * 255;
+                    
+                    hData.data[idx] = outVal;
+                    hData.data[idx+1] = outVal;
+                    hData.data[idx+2] = outVal;
+                    hData.data[idx+3] = 255;
+                }
+            }
+            hctx.putImageData(hData, 0, 0);
         }
+
+        document.getElementById('downloadHaldBtn').addEventListener('click', () => {
+            const canvas = document.getElementById('haldCanvas');
+            const link = document.createElement('a');
+            link.download = 'filament-clut.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
 
         function downloadCube() {
             // Generate a 3D LUT (Size 33) for professional one-click conversion
