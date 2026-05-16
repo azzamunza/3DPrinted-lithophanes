@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -12,113 +12,106 @@
         .bg-zinc-800 { background-color: #27272a; }
         .bg-zinc-950 { background-color: #09090b; }
         input, select { color: white; border: none; outline: none; }
+        canvas { max-width: 100%; height: auto; }
     </style>
 </head>
 <body class="min-h-screen p-6">
     <div class="max-w-7xl mx-auto space-y-6">
-        <div>
-            <h1 class="text-4xl font-bold mb-2">3D Filament Transmittance & LUT Generator</h1>
-            <p class="text-zinc-400 max-w-3xl">
-                Generate Beer-Lambert transmittance curves, image correction curves, and Photoshop-compatible LUT files for creating lithophane and backlit height-map images.
-            </p>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">3D Filament Transmittance & LUT Generator</h1>
+                <p class="text-zinc-400 max-w-3xl">
+                    Professional lithophane heightmap processor. Convert color images to Beer-Lambert corrected displacement maps.
+                </p>
+            </div>
+            <div class="flex gap-2">
+                <button id="downloadCubeBtn" class="bg-white text-black px-6 py-3 rounded-xl font-bold hover:opacity-80 transition shadow-lg">
+                    Download .CUBE (Photoshop)
+                </button>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
-                <h2 class="text-2xl font-semibold">Light Globe Settings</h2>
-                <div>
-                    <label class="block mb-1 text-sm text-zinc-400">Globe Lumens</label>
-                    <input type="number" id="lumens" value="806" class="w-full bg-zinc-800 rounded-xl p-3" />
-                </div>
-                <div>
-                    <label class="block mb-1 text-sm text-zinc-400">Distance from Material (cm)</label>
-                    <input type="number" id="distance" value="10" class="w-full bg-zinc-800 rounded-xl p-3" />
-                </div>
-            </div>
-
-            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
-                <h2 class="text-2xl font-semibold">Filament Settings</h2>
-                <div>
-                    <label class="block mb-1 text-sm text-zinc-400">Filament Type</label>
-                    <select id="filamentType" class="w-full bg-zinc-800 rounded-xl p-3">
-                        <option value="0.6">Elegoo Rapid PETG White</option>
-                        <option value="0.85">Generic White PLA</option>
-                        <option value="0.25">Transparent PETG</option>
-                        <option value="1.1">White ABS</option>
-                    </select>
-                </div>
-                <div class="bg-zinc-800 rounded-xl p-4 flex justify-between items-center">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Settings Column -->
+            <div class="space-y-6">
+                <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h2 class="text-xl font-semibold border-b border-zinc-800 pb-2">Filament Profile</h2>
                     <div>
-                        <div class="text-sm text-zinc-400">Absorption Coefficient (α)</div>
-                        <div class="text-2xl font-bold" id="alphaDisplay">0.6 mm⁻¹</div>
+                        <label class="block mb-1 text-sm text-zinc-400">Filament Type</label>
+                        <select id="filamentType" class="w-full bg-zinc-800 rounded-xl p-3">
+                            <option value="0.6">Elegoo Rapid PETG White</option>
+                            <option value="0.85">Generic White PLA</option>
+                            <option value="0.25">Transparent PETG</option>
+                            <option value="1.1">White ABS</option>
+                        </select>
                     </div>
-                    <div class="text-right">
-                        <label class="block text-sm text-zinc-400">Max Thickness (mm)</label>
-                        <input type="number" id="thickness" step="0.1" value="5" class="bg-transparent text-2xl font-bold w-20 text-right" />
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-zinc-800 rounded-xl p-3">
+                            <div class="text-[10px] uppercase text-zinc-500 mb-1">Absorption (α)</div>
+                            <div class="text-xl font-bold" id="alphaDisplay">0.6</div>
+                        </div>
+                        <div class="bg-zinc-800 rounded-xl p-3 text-right">
+                            <div class="text-[10px] uppercase text-zinc-500 mb-1">Max Depth (mm)</div>
+                            <input type="number" id="thickness" step="0.1" value="5" class="bg-transparent text-xl font-bold w-full text-right" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h2 class="text-xl font-semibold border-b border-zinc-800 pb-2">Processor Visualization</h2>
+                    <div class="space-y-2">
+                        <label class="text-xs text-zinc-500 uppercase">Hald CLUT (Identity Transformed)</label>
+                        <canvas id="haldCanvas" class="w-full aspect-square rounded-lg bg-black border border-zinc-700"></canvas>
+                        <button id="downloadHaldBtn" class="w-full bg-zinc-800 text-xs text-zinc-400 py-2 rounded-lg hover:text-white transition">Download CLUT PNG</button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl h-[400px] flex flex-col">
-                <h2 class="text-2xl font-semibold mb-4">Material Transmittance</h2>
-                <div class="flex-grow relative">
-                    <canvas id="transmittanceChart"></canvas>
-                </div>
-            </div>
-
-            <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl h-[400px] flex flex-col">
-                <h2 class="text-2xl font-semibold mb-4">Correction Curve</h2>
-                <div class="flex-grow relative">
-                    <canvas id="curveChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 class="text-2xl font-semibold">LUT Export & Visualization</h2>
-                <div class="flex gap-3">
-                    <button id="downloadJsonBtn" class="bg-zinc-800 text-white px-4 py-2 rounded-xl font-semibold hover:bg-zinc-700 transition">
-                        JSON
-                    </button>
-                    <button id="downloadCubeBtn" class="bg-white text-black px-4 py-2 rounded-xl font-semibold hover:opacity-80 transition">
-                        Download 3D .CUBE (Full Auto)
-                    </button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-2">
-                    <label class="text-sm text-zinc-400">LUT Visualization Stripe (Final Heightmap Output)</label>
-                    <canvas id="lutCanvas" class="w-full h-16 rounded-lg bg-black border border-zinc-700 shadow-inner"></canvas>
-                    <p class="text-[10px] text-zinc-500">Left (0/Black) to Right (255/White) input mapping</p>
-                </div>
-                <div class="space-y-2 flex flex-col">
-                    <label class="text-sm text-zinc-400">Hald CLUT Image (Visual Reference)</label>
-                    <div class="flex gap-4 items-center">
-                        <canvas id="haldCanvas" class="w-16 h-16 rounded bg-black border border-zinc-700"></canvas>
-                        <button id="downloadHaldBtn" class="bg-zinc-800 text-xs text-zinc-300 px-3 py-1 rounded hover:bg-zinc-700">Download PNG</button>
+            <!-- Charts Column -->
+            <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl h-[350px] flex flex-col">
+                    <h2 class="text-lg font-semibold mb-4">Material Transmittance</h2>
+                    <div class="flex-grow relative">
+                        <canvas id="transmittanceChart"></canvas>
                     </div>
-                    <div id="lutDisplay" class="hidden"></div>
                 </div>
-            </div>
-        </div>
 
-        <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl">
-            <h2 class="text-2xl font-semibold mb-4">Mathematical Model</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-zinc-300">
-                <div>
-                    <span class="text-zinc-500 text-xs block uppercase mb-1">Beer-Lambert</span>
-                    <div class="font-mono text-green-400">T = e^(-αx)</div>
+                <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl h-[350px] flex flex-col">
+                    <h2 class="text-lg font-semibold mb-4">Heightmap Correction</h2>
+                    <div class="flex-grow relative">
+                        <canvas id="curveChart"></canvas>
+                    </div>
                 </div>
-                <div>
-                    <span class="text-zinc-500 text-xs block uppercase mb-1">Inverse Correction</span>
-                    <div class="font-mono text-cyan-400">x = -ln(T) / α</div>
-                </div>
-                <div class="text-sm">
-                    Compensates for exponential light attenuation through filament for accurate backlit imagery.
+
+                <!-- Image Processor Block -->
+                <div class="md:col-span-2 bg-zinc-900 rounded-2xl p-8 shadow-xl space-y-6">
+                    <div class="flex justify-between items-center border-b border-zinc-800 pb-4">
+                        <h2 class="text-2xl font-bold">Live Heightmap Processor</h2>
+                        <input type="file" id="imageUpload" accept="image/*" class="hidden" />
+                        <label for="imageUpload" class="bg-cyan-600 text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-cyan-500 transition font-semibold">
+                            Upload Reference Photo
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <span class="text-xs text-zinc-500 uppercase">Original Input</span>
+                            <div class="aspect-video rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center">
+                                <img id="sourceImg" class="max-h-full max-w-full hidden" />
+                                <div id="uploadPrompt" class="text-zinc-600 text-sm">Waiting for image...</div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-end">
+                                <span class="text-xs text-zinc-500 uppercase">Processed Heightmap (Lithophane Ready)</span>
+                                <button id="downloadProcessedBtn" class="text-[10px] bg-white text-black px-2 py-1 rounded hidden font-bold">SAVE IMAGE</button>
+                            </div>
+                            <div class="aspect-video rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center">
+                                <canvas id="resultCanvas" class="max-h-full max-w-full hidden"></canvas>
+                                <div id="processPrompt" class="text-zinc-600 text-sm italic">Upload an image to see results</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -127,6 +120,7 @@
     <script>
         let currentLutData = [];
         let transmittanceChart, curveChart;
+        let sourceImgObj = null;
 
         function initCharts() {
             const ctx1 = document.getElementById('transmittanceChart').getContext('2d');
@@ -139,17 +133,27 @@
             const ctx2 = document.getElementById('curveChart').getContext('2d');
             curveChart = new Chart(ctx2, {
                 type: 'line',
-                data: { labels: [], datasets: [{ label: 'Output Value', data: [], borderColor: '#22d3ee', tension: 0.1, pointRadius: 0 }] },
+                data: { labels: [], datasets: [{ label: 'Height (0-255)', data: [], borderColor: '#22d3ee', tension: 0.1, pointRadius: 0 }] },
                 options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 255, grid: { color: '#27272a' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
             });
         }
 
+        function getCorrectedValue(r, g, b, alpha, maxThickness) {
+            // 1. Rec.709 Luminance
+            const lum = (0.2126 * r / 255) + (0.7152 * g / 255) + (0.0722 * b / 255);
+            // 2. Beer-Lambert Correction
+            const corrected = -Math.log(Math.max(0.001, lum));
+            // 3. Map to Thickness (0-1), then to (0-255)
+            // This naturally inverts: Bright -> 0 Thickness, Dark -> Max Thickness
+            const outVal = Math.min(corrected / alpha / maxThickness, 1.0);
+            return Math.round(outVal * 255);
+        }
+
         function update() {
-            const lumens = parseFloat(document.getElementById('lumens').value) || 0;
             const alpha = parseFloat(document.getElementById('filamentType').value);
             const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
             
-            document.getElementById('alphaDisplay').innerText = alpha + ' mm⁻¹';
+            document.getElementById('alphaDisplay').innerText = alpha;
 
             // Update Transmittance Chart
             const transLabels = [];
@@ -163,87 +167,101 @@
             transmittanceChart.data.datasets[0].data = transValues;
             transmittanceChart.update();
 
-            // Update Curve & LUT (Synchronized with 3D LUT logic)
+            // Update Curve
             const curveLabels = [];
             const curveValues = [];
-            currentLutData = [];
-
             for (let i = 0; i <= 255; i++) {
-                const brightness = i / 255;
-                const corrected = -Math.log(Math.max(0.001, brightness));
-                
-                // Map to thickness: 0.0 (white/thin) to 1.0 (black/thick)
-                // Note: The log math naturally handles the inversion (1.0 brightness -> 0 corrected)
-                const outVal = Math.min(corrected / alpha / maxThickness, 1.0);
-                const output = Math.round(outVal * 255);
-                
-                currentLutData.push(output);
+                const val = getCorrectedValue(i, i, i, alpha, maxThickness);
                 curveLabels.push(i);
-                curveValues.push(output);
+                curveValues.push(val);
             }
             curveChart.data.labels = curveLabels;
             curveChart.data.datasets[0].data = curveValues;
             curveChart.update();
 
-            // Update LUT Visualization Stripe
-            const canvas = document.getElementById('lutCanvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 64; 
-            for (let i = 0; i < 256; i++) {
-                const val = currentLutData[i];
-                ctx.fillStyle = `rgb(${val}, ${val}, ${val})`;
-                ctx.fillRect(i, 0, 1, 64);
-            }
-
-            // Update Hald CLUT Image (Visual representation of the 3D LUT)
-            const hald = document.getElementById('haldCanvas');
-            const hctx = hald.getContext('2d');
-            hald.width = 64;
-            hald.height = 64;
-            const hData = hctx.createImageData(64, 64);
-            
-            for (let y = 0; y < 64; y++) {
-                for (let x = 0; x < 64; x++) {
-                    const idx = (y * 64 + x) * 4;
-                    const r = (x / 63);
-                    const g = (y / 63);
-                    const b = 0.5; // Fixed blue for visualization
-                    
-                    const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-                    const corrected = -Math.log(Math.max(0.001, luminance));
-                    const outVal = Math.min(corrected / alpha / maxThickness, 1.0) * 255;
-                    
-                    hData.data[idx] = outVal;
-                    hData.data[idx+1] = outVal;
-                    hData.data[idx+2] = outVal;
-                    hData.data[idx+3] = 255;
-                }
-            }
-            hctx.putImageData(hData, 0, 0);
+            updateHald(alpha, maxThickness);
+            processUploadedImage();
         }
 
-        document.getElementById('downloadHaldBtn').addEventListener('click', () => {
+        function updateHald(alpha, maxThickness) {
             const canvas = document.getElementById('haldCanvas');
-            const link = document.createElement('a');
-            link.download = 'filament-clut.png';
-            link.href = canvas.toDataURL();
-            link.click();
+            const ctx = canvas.getContext('2d');
+            const dim = 512; // 8x8 grid of 64x64
+            canvas.width = dim;
+            canvas.height = dim;
+            const imgData = ctx.createImageData(dim, dim);
+            
+            for (let y = 0; y < dim; y++) {
+                for (let x = 0; x < dim; x++) {
+                    const idx = (y * dim + x) * 4;
+                    
+                    // Decode Identity Hald Positions
+                    const r = (x % 64) * 4;
+                    const g = (y % 64) * 4;
+                    const b = (Math.floor(y / 64) * 8 + Math.floor(x / 64)) * 4;
+
+                    const val = getCorrectedValue(r, g, b, alpha, maxThickness);
+                    imgData.data[idx] = val;
+                    imgData.data[idx + 1] = val;
+                    imgData.data[idx + 2] = val;
+                    imgData.data[idx + 3] = 255;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function processUploadedImage() {
+            if (!sourceImgObj) return;
+
+            const alpha = parseFloat(document.getElementById('filamentType').value);
+            const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
+            
+            const canvas = document.getElementById('resultCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = sourceImgObj.width;
+            canvas.height = sourceImgObj.height;
+            
+            ctx.drawImage(sourceImgObj, 0, 0);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const val = getCorrectedValue(data[i], data[i+1], data[i+2], alpha, maxThickness);
+                data[i] = val;
+                data[i+1] = val;
+                data[i+2] = val;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            
+            document.getElementById('resultCanvas').classList.remove('hidden');
+            document.getElementById('processPrompt').classList.add('hidden');
+            document.getElementById('downloadProcessedBtn').classList.remove('hidden');
+        }
+
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                sourceImgObj = new Image();
+                sourceImgObj.onload = function() {
+                    document.getElementById('sourceImg').src = sourceImgObj.src;
+                    document.getElementById('sourceImg').classList.remove('hidden');
+                    document.getElementById('uploadPrompt').classList.add('hidden');
+                    processUploadedImage();
+                };
+                sourceImgObj.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         });
 
         function downloadCube() {
-            // Generate a 3D LUT (Size 33) for professional one-click conversion
-            // This handles: Color -> Grayscale -> Beer-Lambert Correction -> Inversion
             const size = 33;
             const alpha = parseFloat(document.getElementById('filamentType').value);
             const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
 
-            let cubeContent = `# Generated by 3D Filament LUT Tool\n`;
-            cubeContent += `# This 3D LUT converts Color -> Corrected Inverted Grayscale\n`;
-            cubeContent += `TITLE "Filament_Auto_Litho"\n`;
-            cubeContent += `LUT_3D_SIZE ${size}\n`;
-            cubeContent += `DOMAIN_MIN 0.0 0.0 0.0\n`;
-            cubeContent += `DOMAIN_MAX 1.0 1.0 1.0\n\n`;
+            let cubeContent = `# Generated by 3D Filament LUT Tool\nTITLE "Filament_Auto_Litho"\nLUT_3D_SIZE ${size}\nDOMAIN_MIN 0.0 0.0 0.0\nDOMAIN_MAX 1.0 1.0 1.0\n\n`;
 
             for (let b = 0; b < size; b++) {
                 for (let g = 0; g < size; g++) {
@@ -251,22 +269,8 @@
                         const rf = r / (size - 1);
                         const gf = g / (size - 1);
                         const bf = b / (size - 1);
-
-                        // 1. Convert to Luminance (Standard Rec.709 weights)
-                        const luminance = (0.2126 * rf) + (0.7152 * gf) + (0.0722 * bf);
-
-                        // 2. Beer-Lambert Correction
-                        // i = brightness (0-1), output = thickness (normalized)
-                        const corrected = -Math.log(Math.max(0.001, luminance));
-                        
-                        // We scale the output so that 1.0 = Max Thickness.
-                        // For lithophanes: White(1.0) -> Thin(0.0), Black(0.0) -> Thick(1.0)
-                        // The log math naturally maps 1.0 to 0.0.
-                        // We use a denominator of 5.0 as a standard 'deep' shadow cap, or the user max.
-                        const outVal = Math.min(corrected / alpha / maxThickness, 1.0);
-
-                        // Format as RGB (since it's grayscale, R=G=B)
-                        cubeContent += `${outVal.toFixed(6)} ${outVal.toFixed(6)} ${outVal.toFixed(6)}\n`;
+                        const val = (getCorrectedValue(rf * 255, gf * 255, bf * 255, alpha, maxThickness) / 255).toFixed(6);
+                        cubeContent += `${val} ${val} ${val}\n`;
                     }
                 }
             }
@@ -279,16 +283,22 @@
             a.click();
         }
 
-        document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', update));
-        document.getElementById('downloadCubeBtn').addEventListener('click', downloadCube);
-        document.getElementById('downloadJsonBtn').addEventListener('click', () => {
-            const blob = new Blob([JSON.stringify(currentLutData, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "lut-data.json";
-            a.click();
+        document.getElementById('downloadHaldBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'filament-hald-clut.png';
+            link.href = document.getElementById('haldCanvas').toDataURL();
+            link.click();
         });
+
+        document.getElementById('downloadProcessedBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'lithophane-heightmap.png';
+            link.href = document.getElementById('resultCanvas').toDataURL();
+            link.click();
+        });
+
+        document.getElementById('downloadCubeBtn').addEventListener('click', downloadCube);
+        document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', update));
 
         initCharts();
         update();
