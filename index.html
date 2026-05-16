@@ -167,29 +167,30 @@
         }
 
         function getCorrectedValue(r, g, b, alpha, maxThickness) {
-            // 1. Rec.709 Luminance
+            // 1. Rec.709 Luminance (0 to 1 range)
             const lum = (0.2126 * r / 255) + (0.7152 * g / 255) + (0.0722 * b / 255);
             
-            // 2. Linear Contrast Stretch (optional but helpful for 8-bit precision)
-            // If the user's input doesn't hit pure white or pure black, we can clip/stretch here.
+            // 2. THE CORRECTION LOGIC
+            // Light transmission (T) through material (x) is T = e^(-alpha * x).
+            // To get a linear PERCEIVED brightness, we need to map the image's linear 
+            // luminance values to the material thicknesses that produce those specific 
+            // transmission levels.
             
-            // 3. Beer-Lambert Correction (Inverted for Lithophane)
-            // T = e^(-alpha * x)
-            // We want to map Luminance (T) to Thickness (x).
-            // At T=1.0 (White), x should be 0.
-            // At T=min (Dark), x should be maxThickness.
+            // Equation: x = -ln(T) / alpha
+            // When lum = 1.0 (pure white), thickness should be 0.
+            // When lum = 0.01 (black floor), thickness will be high.
             
-            // Log math: thickness is proportional to -ln(T)
-            const thickness = -Math.log(Math.max(0.001, lum)) / alpha;
+            // Logarithmic thickness:
+            const rawThickness = -Math.log(Math.max(0.001, lum)) / alpha;
             
-            // 4. PRESERVE HIGHLIGHTS: Standard Beer-Lambert can be extremely steep at T=1.0.
-            // We apply a slight gamma correction to the thickness calculation to spread out the 
-            // values in the highlight (thin) region.
-            const gamma = 1.2; // Increase detail in thin/bright areas
-            let normalized = Math.pow(thickness / maxThickness, 1 / gamma);
-            
-            normalized = Math.min(Math.max(normalized, 0), 1);
+            // 3. Normalization & Contrast Recovery
+            // The issue: Standard Beer-Lambert is extremely compressed in highlights.
+            // We use a Power Function (Gamma < 1) to push the curve ABOVE the linear 
+            // line in the thickness domain. This expands the detail in the thin/bright regions.
+            const liftGamma = 0.45; 
+            const normalized = Math.pow(Math.min(rawThickness / maxThickness, 1.0), liftGamma);
 
+            // 4. Final Output (0 = White/Thin, 255 = Black/Thick)
             return Math.round(normalized * 255);
         }
 
