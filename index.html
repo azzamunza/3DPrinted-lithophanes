@@ -55,6 +55,20 @@
                             <input type="number" id="thickness" step="0.1" value="5" class="bg-transparent text-xl font-bold w-full text-right" />
                         </div>
                     </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div class="bg-zinc-800 rounded-xl p-3">
+                            <div class="text-[10px] uppercase text-zinc-500 mb-1">Globe Dia (mm)</div>
+                            <input type="number" id="globeDiameter" step="1" value="100" class="bg-transparent text-xl font-bold w-full" />
+                        </div>
+                        <div class="bg-zinc-800 rounded-xl p-3 text-right">
+                            <div class="text-[10px] uppercase text-zinc-500 mb-1">Filament Dist (mm)</div>
+                            <input type="number" id="filamentDistance" step="1" value="50" class="bg-transparent text-xl font-bold w-full text-right" />
+                        </div>
+                    </div>
+                    <div class="bg-zinc-800 rounded-xl p-3">
+                        <div class="text-[10px] uppercase text-zinc-500 mb-1">Proj. Area (mm²)</div>
+                        <div class="text-lg font-mono text-zinc-400" id="areaDisplay">31415.9</div>
+                    </div>
                 </div>
 
                 <div class="bg-zinc-900 rounded-2xl p-6 shadow-xl space-y-4">
@@ -166,29 +180,32 @@
             });
         }
 
-        function getCorrectedValue(r, g, b, alpha, maxThickness) {
+        function getCorrectedValue(r, g, b, alpha, maxThickness, globeDiameter, filamentDistance) {
             // 1. Rec.709 Luminance (0 to 1 range)
             const lum = (0.2126 * r / 255) + (0.7152 * g / 255) + (0.0722 * b / 255);
             
             // 2. THE CORRECTION LOGIC
             // Light transmission (T) through material (x) is T = e^(-alpha * x).
-            // To get a linear PERCEIVED brightness, we need to map the image's linear 
-            // luminance values to the material thicknesses that produce those specific 
-            // transmission levels.
             
-            // Equation: x = -ln(T) / alpha
-            // When lum = 1.0 (pure white), thickness should be 0.
-            // When lum = 0.01 (black floor), thickness will be high.
+            // Inclusion of Globe Geometry:
+            // Intensity at surface I_s = P / (4 * PI * d^2)
+            // Or modeled by Surface Area A = PI * D^2
+            const area = Math.PI * Math.pow(globeDiameter, 2);
             
-            // Logarithmic thickness:
-            const rawThickness = -Math.log(Math.max(0.001, lum)) / alpha;
+            // We use the area and distance to scale the required transmission.
+            // Larger distance/area means lower base intensity, requiring thinner material for same brightness.
+            // We normalize against a reference globe (100mm dia, 50mm distance).
+            const geometryScale = (area / 31415.9) * (Math.pow(filamentDistance / 50, 2));
+            
+            // Equation: x = -ln(T * geometryScale) / alpha
+            const rawThickness = -Math.log(Math.max(0.001, lum * geometryScale)) / alpha;
             
             // 3. Normalization & Contrast Recovery
             // The issue: Standard Beer-Lambert is extremely compressed in highlights.
             // We use a Power Function (Gamma < 1) to push the curve ABOVE the linear 
             // line in the thickness domain. This expands the detail in the thin/bright regions.
             const liftGamma = 0.45; 
-            const normalized = Math.pow(Math.min(rawThickness / maxThickness, 1.0), liftGamma);
+            const normalized = Math.pow(Math.min(Math.max(0, rawThickness) / maxThickness, 1.0), liftGamma);
 
             // 4. Final Output (0 = White/Thin, 255 = Black/Thick)
             return Math.round(normalized * 255);
@@ -197,8 +214,11 @@
         function update() {
             const alpha = parseFloat(document.getElementById('filamentType').value);
             const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
+            const globeDiameter = parseFloat(document.getElementById('globeDiameter').value) || 100;
+            const filamentDistance = parseFloat(document.getElementById('filamentDistance').value) || 50;
             
             document.getElementById('alphaDisplay').innerText = alpha;
+            document.getElementById('areaDisplay').innerText = (Math.PI * Math.pow(globeDiameter, 2)).toFixed(1);
 
             // Update Transmittance Chart
             const transLabels = [];
@@ -216,7 +236,7 @@
             const curveLabels = [];
             const curveValues = [];
             for (let i = 0; i <= 255; i++) {
-                const val = getCorrectedValue(i, i, i, alpha, maxThickness);
+                const val = getCorrectedValue(i, i, i, alpha, maxThickness, globeDiameter, filamentDistance);
                 curveLabels.push(i);
                 curveValues.push(val);
             }
@@ -224,11 +244,11 @@
             curveChart.data.datasets[0].data = curveValues;
             curveChart.update();
 
-            updateHald(alpha, maxThickness);
+            updateHald(alpha, maxThickness, globeDiameter, filamentDistance);
             processUploadedImage();
         }
 
-        function updateHald(alpha, maxThickness) {
+        function updateHald(alpha, maxThickness, globeDiameter, filamentDistance) {
             const canvas = document.getElementById('haldCanvas');
             const ctx = canvas.getContext('2d');
             const dim = 512; // 8x8 grid of 64x64
@@ -245,7 +265,7 @@
                     const g = (y % 64) * 4;
                     const b = (Math.floor(y / 64) * 8 + Math.floor(x / 64)) * 4;
 
-                    const val = getCorrectedValue(r, g, b, alpha, maxThickness);
+                    const val = getCorrectedValue(r, g, b, alpha, maxThickness, globeDiameter, filamentDistance);
                     imgData.data[idx] = val;
                     imgData.data[idx + 1] = val;
                     imgData.data[idx + 2] = val;
@@ -260,6 +280,8 @@
 
             const alpha = parseFloat(document.getElementById('filamentType').value);
             const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
+            const globeDiameter = parseFloat(document.getElementById('globeDiameter').value) || 100;
+            const filamentDistance = parseFloat(document.getElementById('filamentDistance').value) || 50;
             
             const canvas = document.getElementById('resultCanvas');
             const ctx = canvas.getContext('2d');
@@ -278,7 +300,7 @@
                 const inLum = Math.round((0.2126 * r) + (0.7152 * g) + (0.0722 * b));
                 inputHist[inLum]++;
 
-                const val = getCorrectedValue(r, g, b, alpha, maxThickness);
+                const val = getCorrectedValue(r, g, b, alpha, maxThickness, globeDiameter, filamentDistance);
                 data[i] = val;
                 data[i+1] = val;
                 data[i+2] = val;
@@ -318,6 +340,8 @@
             const size = 33;
             const alpha = parseFloat(document.getElementById('filamentType').value);
             const maxThickness = parseFloat(document.getElementById('thickness').value) || 5;
+            const globeDiameter = parseFloat(document.getElementById('globeDiameter').value) || 100;
+            const filamentDistance = parseFloat(document.getElementById('filamentDistance').value) || 50;
 
             let cubeContent = `# Generated by 3D Filament LUT Tool\nTITLE "Filament_Auto_Litho"\nLUT_3D_SIZE ${size}\nDOMAIN_MIN 0.0 0.0 0.0\nDOMAIN_MAX 1.0 1.0 1.0\n\n`;
 
@@ -327,7 +351,7 @@
                         const rf = r / (size - 1);
                         const gf = g / (size - 1);
                         const bf = b / (size - 1);
-                        const val = (getCorrectedValue(rf * 255, gf * 255, bf * 255, alpha, maxThickness) / 255).toFixed(6);
+                        const val = (getCorrectedValue(rf * 255, gf * 255, bf * 255, alpha, maxThickness, globeDiameter, filamentDistance) / 255).toFixed(6);
                         cubeContent += `${val} ${val} ${val}\n`;
                     }
                 }
